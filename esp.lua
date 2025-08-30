@@ -1,10 +1,10 @@
--- Toggle ESP
-function ESPModule:Toggle(state)
-    self.Enabled = state
-    ESPRemote:FireServer(state)
-end
+-- ModuleScript ESP (à placer dans ReplicatedStorage ou à utiliser via require)
 
--- Client Side: Surveiller les personnages pour appliquer l’ESP localement
+local Players = game:GetService("Players")
+
+local ESPModule = {}
+ESPModule.Enabled = false
+
 local function createESP(part)
     local sides = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
     for _, side in pairs(sides) do
@@ -32,26 +32,28 @@ local function removeESP(part)
     end
 end
 
--- Client reçoit les updates de toggle du serveur (optionnel si tu veux l’affichage local direct)
-ESPRemote.OnClientEvent:Connect(function(state)
-    local player = Players.LocalPlayer
-    if not player.Character then return end
-    for _, part in pairs(player.Character:GetChildren()) do
-        if part:IsA("BasePart") then
-            if state then
-                createESP(part)
-            else
-                removeESP(part)
+function ESPModule:Toggle(state)
+    self.Enabled = state
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            for _, part in ipairs(player.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    if state then
+                        createESP(part)
+                    else
+                        removeESP(part)
+                    end
+                end
             end
         end
     end
-end)
+end
 
--- Surveiller les parties qui apparaissent après le toggle
+-- Met à jour l'ESP pour les nouveaux joueurs/personnages
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(char)
         if ESPModule.Enabled then
-            for _, part in pairs(char:GetChildren()) do
+            for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
                     createESP(part)
                 end
@@ -59,5 +61,3 @@ Players.PlayerAdded:Connect(function(player)
         end
     end)
 end)
-
-return ESPModule
