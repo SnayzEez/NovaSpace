@@ -5,7 +5,6 @@ ESPModule.Enabled = false
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 -- Vérifie si le RemoteEvent existe sinon le créer
 local ESPRemote = ReplicatedStorage:FindFirstChild("ESPRemote")
@@ -15,13 +14,13 @@ if not ESPRemote then
     ESPRemote.Parent = ReplicatedStorage
 end
 
--- Toggle ESP
+-- Toggle Skeleton ESP
 function ESPModule:Toggle(state)
     self.Enabled = state
     ESPRemote:FireServer(state)
 end
 
--- Client Side: Surveiller les personnages pour appliquer l’ESP localement
+-- Fonction pour créer l’ESP sur une partie
 local function createESP(part)
     local sides = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
     for _, side in pairs(sides) do
@@ -41,6 +40,7 @@ local function createESP(part)
     end
 end
 
+-- Fonction pour retirer l’ESP
 local function removeESP(part)
     for _, sg in pairs(part:GetChildren()) do
         if sg:IsA("SurfaceGui") and sg.Name == "ESP" then
@@ -49,7 +49,7 @@ local function removeESP(part)
     end
 end
 
--- Client reçoit les updates de toggle du serveur (optionnel si tu veux l’affichage local direct)
+-- Appliquer ESP sur le personnage local
 ESPRemote.OnClientEvent:Connect(function(state)
     local player = Players.LocalPlayer
     if not player.Character then return end
@@ -64,7 +64,7 @@ ESPRemote.OnClientEvent:Connect(function(state)
     end
 end)
 
--- Surveiller les parties qui apparaissent après le toggle
+-- Surveiller les nouveaux personnages
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(char)
         if ESPModule.Enabled then
@@ -78,4 +78,3 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 return ESPModule
-
