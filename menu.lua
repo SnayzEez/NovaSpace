@@ -79,7 +79,7 @@ for i, tabName in pairs(tabs) do
     contentFrames[tabName] = content
 end
 
--- Compteur de toggles par onglet pour l'affichage vertical
+-- Compteur de toggles par onglet
 local toggleCounts = {
     Visual = 0,
     Aim = 0,
@@ -90,7 +90,6 @@ local toggleCounts = {
 -- Fonction création toggle
 local function createToggle(parent, text, callback, ignoreColor)
     local state = false
-    -- Trouve le nom de l'onglet correspondant au parent
     local tabName = nil
     for name, frame in pairs(contentFrames) do
         if frame == parent then
@@ -121,14 +120,13 @@ local function createToggle(parent, text, callback, ignoreColor)
     return btn
 end
 
--- ESP Toggle logic
+-- ESP Skeleton Toggle logic
 local espActive = false
 local espObjects = {}
 
 local function ToggleESP(state)
     espActive = state
     if not espActive then
-        -- Supprime tous les ESP existants
         for _, obj in pairs(espObjects) do
             if obj and obj.Parent then
                 obj:Destroy()
@@ -138,7 +136,6 @@ local function ToggleESP(state)
     end
 end
 
--- Fonction ESP
 local function UpdateESP()
     if not espActive then return end
     for _, player in pairs(Players:GetPlayers()) do
@@ -150,7 +147,7 @@ local function UpdateESP()
                     surface.Name = "ESP"
                     local frame = Instance.new("Frame", surface)
                     frame.Size = UDim2.new(1,0,1,0)
-                    frame.BackgroundColor3 = Color3.fromRGB(0,255,0)
+                    frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
                     frame.BorderSizePixel = 0
                     espObjects[part] = surface
                 end
@@ -159,10 +156,143 @@ local function UpdateESP()
     end
 end
 
-RunService.RenderStepped:Connect(UpdateESP)
+-- ESP Box bouton (utilise Drawing API)
+local espBoxThread = nil
+
+local function ToggleESPBox(state)
+    getgenv().boolBoxes = state
+    if state then
+        espBoxThread = coroutine.create(function()
+            local Players = game.Players
+            local Camera = workspace.CurrentCamera
+            local lp = Players.LocalPlayer
+            local Boxes = {}
+
+            -- Supprimer box quand un joueur quitte
+            local PlayerRemovingConnection = Players.PlayerRemoving:Connect(function(player)
+                if Boxes[player.Name] then
+                    Boxes[player.Name]:Remove()
+                    Boxes[player.Name] = nil
+                end
+            end)
+
+            local function mean(t)
+                local sum = 0
+                for _,v in pairs(t) do sum = sum + v end
+                return sum / #t
+            end
+
+            while getgenv().boolBoxes do
+                task.wait()
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= lp and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
+                        if not Boxes[player.Name] then
+                            local sq = Drawing.new("Square")
+                            sq.Visible = false
+                            sq.Thickness = 1
+                            sq.Size = Vector2.new(10,10)
+                            sq.Filled = false
+                            sq.Color = Color3.fromRGB(255,0,255)
+                            Boxes[player.Name] = sq
+                        end
+
+                        local head = player.Character.Head
+                        local hrp = player.Character.HumanoidRootPart
+                        local headScreenPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+                        local hrpScreenPos, hrpOnScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                        if headOnScreen and hrpOnScreen then
+                            local distScreen = (headScreenPos - hrpScreenPos).Magnitude
+                            local centerPos = Vector3.new(mean({head.Position.x, hrp.Position.x}),
+                                                          mean({head.Position.y, hrp.Position.y}),
+                                                          mean({head.Position.z, hrp.Position.z}))
+                            local centerScreenPos = Camera:WorldToViewportPoint(centerPos)
+
+                            Boxes[player.Name].Visible = true
+                            Boxes[player.Name].Position = Vector2.new(centerScreenPos.x - distScreen, centerScreenPos.y - distScreen)
+                            Boxes[player.Name].Size = Vector2.new(distScreen*2, distScreen*3)
+                        else
+                            Boxes[player.Name].Visible = false
+                        end
+                    end
+                end
+            end
+
+            -- Cleanup
+            PlayerRemovingConnection:Disconnect()
+            for _, v in pairs(Boxes) do
+                v:Remove()
+            end
+            Boxes = {}
+        end)
+        coroutine.resume(espBoxThread)
+    else
+        getgenv().boolBoxes = false
+    end
+end
+
+-- ESP Name bouton (exemple basique, adapte avec ton code si besoin)
+local espNameThread = nil
+
+local function ToggleESPName(state)
+    getgenv().boolNames = state
+    if state then
+        espNameThread = coroutine.create(function()
+            local Players = game.Players
+            local Camera = workspace.CurrentCamera
+            local lp = Players.LocalPlayer
+            local Names = {}
+
+            local PlayerRemovingConnection = Players.PlayerRemoving:Connect(function(player)
+                if Names[player.Name] then
+                    Names[player.Name]:Remove()
+                    Names[player.Name] = nil
+                end
+            end)
+
+            while getgenv().boolNames do
+                task.wait()
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= lp and player.Character and player.Character:FindFirstChild("Head") then
+                        if not Names[player.Name] then
+                            local txt = Drawing.new("Text")
+                            txt.Visible = false
+                            txt.Size = 16
+                            txt.Center = true
+                            txt.Outline = true
+                            txt.Color = Color3.fromRGB(255,255,255)
+                            txt.Text = player.Name
+                            Names[player.Name] = txt
+                        end
+
+                        local head = player.Character.Head
+                        local headScreenPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,1.5,0))
+                        if headOnScreen then
+                            Names[player.Name].Visible = true
+                            Names[player.Name].Position = Vector2.new(headScreenPos.X, headScreenPos.Y)
+                        else
+                            Names[player.Name].Visible = false
+                        end
+                    end
+                end
+            end
+
+            PlayerRemovingConnection:Disconnect()
+            for _, v in pairs(Names) do
+                v:Remove()
+            end
+            Names = {}
+        end)
+        coroutine.resume(espNameThread)
+    else
+        getgenv().boolNames = false
+    end
+end
 
 -- Visual Toggles
-createToggle(contentFrames["Visual"], "ESP 1", ToggleESP)
+createToggle(contentFrames["Visual"], "ESP Skeleton", ToggleESP)
+createToggle(contentFrames["Visual"], "ESP Box", ToggleESPBox)
+createToggle(contentFrames["Visual"], "ESP Name", ToggleESPName)
 
 -- Aim Toggles
 local aimToggles = {"Aimbot", "Aim Fov", "Aim Smooth", "Silent Aim"}
@@ -172,22 +302,35 @@ for _, name in pairs(aimToggles) do
     end)
 end
 
--- Settings Toggles
-local function addSettingButton(text, callback, ignoreColor)
-    createToggle(contentFrames["Settings"], text, callback, ignoreColor)
+-- Settings : Countering → simples boutons
+local function addSettingButton(text, callback)
+    toggleCounts["Settings"] = toggleCounts["Settings"] + 1
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, ((toggleCounts["Settings"] or 1)-1)*45)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 18
+    btn.Text = text
+    btn.Parent = contentFrames["Settings"]
+
+    btn.MouseButton1Click:Connect(function()
+        callback()
+    end)
 end
 
-addSettingButton("White Countering", function(state)
+addSettingButton("White Countering", function()
     mainFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
     outline.Color = Color3.fromRGB(255,255,255)
-end, true)
+end)
 
-addSettingButton("Pink Countering", function(state)
+addSettingButton("Pink Countering", function()
     mainFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
     outline.Color = Color3.fromHex("FF26A3")
-end, true)
+end)
 
--- Show FPS
+-- Show FPS (reste toggle)
 local fpsGui = Instance.new("ScreenGui")
 fpsGui.Name = "FPSGui"
 fpsGui.ResetOnSpawn = false
@@ -205,13 +348,15 @@ fpsLabel.Text = "FPS: 0"
 fpsLabel.Parent = fpsGui
 fpsLabel.Visible = false
 
-addSettingButton("Show FPS", function(state)
+createToggle(contentFrames["Settings"], "Show FPS", function(state)
     fpsLabel.Visible = state
-end)
+end, true)
 
 local lastTime = tick()
 local frameCount = 0
+
 RunService.RenderStepped:Connect(function()
+    UpdateESP()
     if fpsLabel.Visible then
         frameCount = frameCount + 1
         local currentTime = tick()
@@ -247,7 +392,7 @@ end
 -- Onglet Visual par défaut
 contentFrames["Visual"].Visible = true
 
--- Info raccourci en bas
+-- Info raccourci
 local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, 0, 0, 20)
 infoLabel.Position = UDim2.new(0, 0, 1, -25)
