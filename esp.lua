@@ -1,56 +1,81 @@
+-- ESPModule.lua
+-- Place ce ModuleScript dans ReplicatedStorage
+local ESPModule = {}
+ESPModule.Enabled = false
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local sides = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
+-- Vérifie si le RemoteEvent existe sinon le créer
+local ESPRemote = ReplicatedStorage:FindFirstChild("ESPRemote")
+if not ESPRemote then
+    ESPRemote = Instance.new("RemoteEvent")
+    ESPRemote.Name = "ESPRemote"
+    ESPRemote.Parent = ReplicatedStorage
+end
 
-function EspChar()
-    --pcall(function()
-        local players = game:GetService("Players")
-        for i,v in pairs(players:GetChildren()) do
-            local char = v.Character or v.CharacterAdded:Wait()
-            if v.Name ~= game.Players.LocalPlayer.Name then
-                for _,a in pairs(char:GetChildren()) do
-                    if not a:FindFirstChild("ESP") then
-                        if a.ClassName == "MeshPart" or a.ClassName == "Part" then
-                            for _,y in pairs(sides) do
-                                local sg = Instance.new("SurfaceGui")
-                                sg.Name = "ESP"
-                                sg.Face = y
-                                sg.Adornee = a
-                                sg.Parent = a
-                                sg.AlwaysOnTop = true
-                                sg.MaxDistance = math.huge
-                                sg.LightInfluence = 0
-                                sg.Brightness = 1000
-                                sg.ZOffset = 1
-                                local fr = Instance.new("Frame")
-                                fr.Name = "ESP"
-                                fr.Parent = sg
-                                fr.Size = UDim2.new(1,0,1,0)
-                                fr.BackgroundColor3 = Color3.new(0, 1, 0)
-                                fr.Transparency = 0.3
-                            end
-                        end
-                    end
+-- Toggle ESP
+function ESPModule:Toggle(state)
+    self.Enabled = state
+    ESPRemote:FireServer(state)
+end
+
+-- Client Side: Surveiller les personnages pour appliquer l’ESP localement
+local function createESP(part)
+    local sides = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
+    for _, side in pairs(sides) do
+        local sg = Instance.new("SurfaceGui")
+        sg.Name = "ESP"
+        sg.Face = side
+        sg.Adornee = part
+        sg.Parent = part
+        sg.AlwaysOnTop = true
+        sg.ZOffset = 1
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        frame.BackgroundTransparency = 0.3
+        frame.Parent = sg
+    end
+end
+
+local function removeESP(part)
+    for _, sg in pairs(part:GetChildren()) do
+        if sg:IsA("SurfaceGui") and sg.Name == "ESP" then
+            sg:Destroy()
+        end
+    end
+end
+
+-- Client reçoit les updates de toggle du serveur (optionnel si tu veux l’affichage local direct)
+ESPRemote.OnClientEvent:Connect(function(state)
+    local player = Players.LocalPlayer
+    if not player.Character then return end
+    for _, part in pairs(player.Character:GetChildren()) do
+        if part:IsA("BasePart") then
+            if state then
+                createESP(part)
+            else
+                removeESP(part)
+            end
+        end
+    end
+end)
+
+-- Surveiller les parties qui apparaissent après le toggle
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+        if ESPModule.Enabled then
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    createESP(part)
                 end
             end
         end
-    --end)
-end
-
-local connectPlayerAdded = game:GetService("Players").PlayerAdded:Connect(function(player) ---- player joins game
-    local connectCharacterAdded = player.CharacterAdded:Connect(function(char) ---- Character is added to workspace
-        if player.Name ~= game.Players.LocalPlayer.name then
-            repeat
-                task.wait(.2)
-            until player.Character and player.Character.Humanoid and player.Character.HumanoidRootPart
-            task.wait(1)
-            EspChar()
-        end
-    end)  
+    end)
 end)
 
+return ESPModule
 
-EspChar()
-
-
-    
